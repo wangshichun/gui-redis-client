@@ -34,11 +34,12 @@ public class RedisJFrame extends JFrame {
         this.setSize(SwingUtil.SCREEN_SIZE.width, SwingUtil.SCREEN_SIZE.height - 150);
         this.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         this.getContentPane().setLayout(new FlowLayout(FlowLayout.LEFT));
+        boolean isDangdangDomain = "DANGDANG".equalsIgnoreCase(System.getenv("USERDOMAIN"));
 
         // 添加控件
-        JLabel label = new JLabel("当当zookeeper地址（"
-                + "格式为“10.255.242.19:2183/redisCluster/order/zkRedisClusterStatus”"
-                + "），或redis地址（格式为“10.255.209.177:6379”）：");
+        JLabel label = new JLabel((isDangdangDomain ? "当当zookeeper地址（"
+                + "格式为“zookeeper的ip:端口/redisCluster/order/zkRedisClusterStatus”），或" : "")
+                + "redis地址（格式为“10.255.209.177:6379”）：");
         this.add(label);
         SwingUtil.addNewLineTo(this);
         SwingUtil.addSpaceTo(this, 4);
@@ -57,7 +58,9 @@ public class RedisJFrame extends JFrame {
         final JButton connectButton = new JButton("连接");
         this.add(connectButton);
         JButton changeAddressButton = new JButton("换");
-        this.add(changeAddressButton);
+        if (isDangdangDomain){
+            this.add(changeAddressButton);
+        }
         changeAddressButton.setForeground(Color.LIGHT_GRAY);
         changeAddressButton.setMargin(new Insets(0, 0, 0, 0));
         changeAddressButton.addMouseListener(new MouseAdapter() {
