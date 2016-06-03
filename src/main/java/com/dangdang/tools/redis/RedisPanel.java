@@ -91,9 +91,9 @@ public class RedisPanel extends JPanel {
         this.add(setButton);
         label = new JLabel("value设置为字符串:");
         this.add(label);
-        final JTextArea redisValueTextArea = new JTextArea(3, SwingUtil.SCREEN_SIZE.width * 7 / 10 / SwingUtil.SPACE_WIDTH / 10);
+        final JTextArea redisValueTextArea = new JTextArea(7, SwingUtil.SCREEN_SIZE.width * 7 / 10 / SwingUtil.SPACE_WIDTH / 10);
         redisValueTextArea.setLineWrap(true);
-        this.add(redisValueTextArea);
+        this.add(new JScrollPane(redisValueTextArea));
         redisValueTextArea.setComponentPopupMenu(SwingUtil.makePopupMenu());
         final JComboBox setFlagBox = new JComboBox();
         setFlagBox.addItem("");
