@@ -13,6 +13,7 @@ import java.util.*;
  */
 public class RedisUtil {
     private static ShardedJedis shardedJedis;
+    private static String jedisPassword = null;
 
     public static void init(List<JedisShardInfo> shardInfos, String password) {
         destroy();
@@ -20,7 +21,7 @@ public class RedisUtil {
         shardedJedis = new ShardedJedis(shardInfos, Hashing.MURMUR_HASH);
 
         if (null != password && password.trim().length() > 0) {
-            shardedJedis.getShard("test").auth(password);
+            jedisPassword = password;
         }
         testConnected();
     }
@@ -29,8 +30,15 @@ public class RedisUtil {
         if (null == shardedJedis)
             return false;
 
-        Boolean exists = shardedJedis.getShard("test").exists("test");
+        Boolean exists = getShard("test").exists("test");
         return exists != null;
+    }
+    private static Jedis getShard(String key) {
+        Jedis jedis = shardedJedis.getShard(key);
+        if (jedisPassword != null) {
+            jedis.auth(jedisPassword);
+        }
+        return jedis;
     }
     private static void destroy() {
         try {
@@ -43,6 +51,7 @@ public class RedisUtil {
             e.printStackTrace();
         }
         shardedJedis = null;
+        jedisPassword = null;
     }
     public static ShardedJedis getShardedJedis() {
         return shardedJedis;
@@ -73,6 +82,8 @@ public class RedisUtil {
             }
         }
         jedis.select(db);
+        if (jedisPassword != null)
+            jedis.auth(jedisPassword);
 
         // 执行scan，如果有结果，则返回结果，否则，执行keys命令
         ScanParams param = new ScanParams().match(keyPattern).count(2000);
@@ -91,7 +102,7 @@ public class RedisUtil {
 
     // 删除key
     public static boolean del(String key, int db) {
-        Jedis jedis = shardedJedis.getShard(key.getBytes());
+        Jedis jedis = getShard(key);
         jedis.select(db);
         long r = jedis.del(key.getBytes());
         jedis.close();
@@ -100,7 +111,7 @@ public class RedisUtil {
 
     // set值
     public static String set(int db, String key, String value, String ttlValue, String exists) {
-        Jedis jedis = shardedJedis.getShard(key.getBytes());
+        Jedis jedis = getShard(key);
         jedis.select(db);
         String result = "";
         if (null == exists || exists.isEmpty()) {
@@ -126,7 +137,7 @@ public class RedisUtil {
 
     // get值
     public static byte[] get(int db, String key) {
-        Jedis jedis = shardedJedis.getShard(key.getBytes());
+        Jedis jedis = getShard(key);
         jedis.select(db);
         byte[] arr = jedis.get(key.getBytes());
         jedis.close();
@@ -135,7 +146,7 @@ public class RedisUtil {
     }
     // type值
     public static String type(int db, String key) {
-        Jedis jedis = shardedJedis.getShard(key.getBytes());
+        Jedis jedis = getShard(key);
         jedis.select(db);
         String type = jedis.type(key.getBytes());
         jedis.close();
@@ -143,7 +154,7 @@ public class RedisUtil {
         return type;
     }
     public static Boolean exists(int db, String key) {
-        Jedis jedis = shardedJedis.getShard(key.getBytes());
+        Jedis jedis = getShard(key);
         jedis.select(db);
         Boolean exists = jedis.exists(key.getBytes());
         jedis.close();
@@ -151,7 +162,7 @@ public class RedisUtil {
         return exists;
     }
     public static Long ttl(int db, String key) {
-        Jedis jedis = shardedJedis.getShard(key.getBytes());
+        Jedis jedis = getShard(key);
         jedis.select(db);
         Long exists = jedis.ttl(key.getBytes());
         jedis.close();
