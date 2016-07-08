@@ -4,8 +4,6 @@ import com.dangdang.tools.redis.event.ExtractRedisAddress;
 import com.dangdang.tools.redis.util.RedisUtil;
 import com.dangdang.tools.redis.util.SwingUtil;
 import redis.clients.jedis.JedisShardInfo;
-import redis.clients.jedis.ShardedJedis;
-import redis.clients.util.Hashing;
 
 import javax.swing.*;
 import java.awt.*;
@@ -27,7 +25,8 @@ public class RedisJFrame extends JFrame {
     };
     private JLabel tipsLabel;
     private JTextField redisPasswordText;
-    private RedisPanel redisPanel = new RedisPanel();
+    private RedisCRUDPanel redisPanel = new RedisCRUDPanel();
+    private RedisInfoPanel redisInfoPanel = new RedisInfoPanel();
 
     public RedisJFrame() {
         this.setTitle("redis 工具");
@@ -96,7 +95,11 @@ public class RedisJFrame extends JFrame {
         SwingUtil.addNewLineTo(this);
 
         // 添加redis的panel
-        this.getContentPane().add(redisPanel);
+//        this.getContentPane().add(redisPanel);
+        JTabbedPane tabbedPane = new JTabbedPane();
+        this.getContentPane().add(tabbedPane);
+        tabbedPane.addTab("  CRUD  ", redisPanel);
+        tabbedPane.addTab("  服务器信息  ", redisInfoPanel);
 
         // 事件关联
         connectButton.addMouseListener(new MouseAdapter() {
@@ -125,6 +128,7 @@ public class RedisJFrame extends JFrame {
             List<JedisShardInfo> shardInfos = new ExtractRedisAddress().extract(address);
             RedisUtil.init(shardInfos, redisPasswordText.getText().trim());
             redisPanel.setShardedJedisInfo();
+            redisInfoPanel.initServers();
             setTips(shardInfos);
         } catch (Throwable throwable) {
             throwable.printStackTrace();

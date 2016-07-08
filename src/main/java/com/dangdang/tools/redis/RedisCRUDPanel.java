@@ -15,11 +15,12 @@ import java.nio.charset.Charset;
 /**
  * Created by wangshichun on 2015/12/9.
  */
-public class RedisPanel extends JPanel {
+@SuppressWarnings("ALL")
+public class RedisCRUDPanel extends JPanel {
     private JLabel redisServersLabel = new JLabel();
     private JComboBox<String> charsetBox = new JComboBox<String>();
     private JComboBox<String> dbBox = new JComboBox<String>();
-    public RedisPanel() {
+    public RedisCRUDPanel() {
         super();
         this.setPreferredSize(SwingUtil.SCREEN_SIZE);
         this.setBackground(new Color(230, 230, 230));
@@ -28,7 +29,7 @@ public class RedisPanel extends JPanel {
         this.add(redisServersLabel);
         this.add(new JLabel("强制db为:"));
         this.add(dbBox);
-        for (int i = 0; i < 10; i++) {
+        for (int i = 0; i < 16; i++) {
             dbBox.addItem(String.valueOf(i));
         }
         SwingUtil.addNewLineTo(this);

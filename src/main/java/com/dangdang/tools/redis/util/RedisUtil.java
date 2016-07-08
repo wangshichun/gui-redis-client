@@ -4,6 +4,7 @@ import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisShardInfo;
 import redis.clients.jedis.ScanParams;
 import redis.clients.jedis.ShardedJedis;
+import redis.clients.jedis.exceptions.JedisDataException;
 import redis.clients.util.Hashing;
 
 import java.util.*;
@@ -170,6 +171,20 @@ public class RedisUtil {
         return exists;
     }
 
+    public static List<String> getAllShards() {
+        List<String> list = new LinkedList<String>();
+        if (!testConnected())
+            return list;
+
+        Collection<Jedis> shardInfos = shardedJedis.getAllShards();
+        for (Jedis jedis : shardInfos) {
+            String host = jedis.getClient().getHost();
+            int port = jedis.getClient().getPort();
+            list.add(host + ":" + port);
+        }
+        return list;
+    }
+
     public static String getShardsInfoString() {
         Collection<Jedis> shardInfos = shardedJedis.getAllShards();
         StringBuilder stringBuilder = new StringBuilder("共有").append(shardInfos.size()).append("个shard, 当前redis: [");
@@ -182,5 +197,119 @@ public class RedisUtil {
         }
         stringBuilder.append("]");
         return stringBuilder.toString();
+    }
+
+    public static Jedis getJedis(String hostPort, int db) {
+        if (hostPort == null || hostPort.indexOf(":") < 1)
+            return null;
+        try {
+            String[] arr = hostPort.split(":");
+            Jedis jedis = new Jedis(arr[0], Integer.valueOf(arr[1]));
+            try {
+                jedis.exists("x");
+            } catch (JedisDataException e) {
+                if (jedisPassword != null && e.getMessage().contains("NOAUTH"))
+                    jedis.auth(jedisPassword);
+            }
+            jedis.select(db);
+            return jedis;
+        } catch (Throwable e) {
+            return null;
+        }
+    }
+
+    public static String clusterInfoString(Jedis jedis) {
+        try {
+            if (jedis == null)
+                jedis = shardedJedis.getAllShards().iterator().next();
+            return jedis.clusterInfo();
+        } catch (Throwable e) {
+            return "";
+        }
+    }
+
+    public static String clusterNodesString(Jedis jedis) {
+        try {
+            if (jedis == null)
+                jedis = shardedJedis.getAllShards().iterator().next();
+            return jedis.clusterNodes();
+        } catch (Throwable e) {
+            return "";
+        }
+    }
+
+    public static String clusterSlotsString(Jedis jedis) {
+        try {
+            if (jedis == null)
+                jedis = shardedJedis.getAllShards().iterator().next();
+            List<Object> slots = jedis.clusterSlots();
+            return clusterSlots2String(slots);
+        } catch (Throwable e) {
+            return "";
+        }
+    }
+
+    public static List<Object> clusterSlots(Jedis jedis) {
+        try {
+            if (jedis == null)
+                jedis = shardedJedis.getAllShards().iterator().next();
+            List<Object> slots = jedis.clusterSlots();
+            return slots;
+        } catch (Throwable e) {
+            return new LinkedList<Object>();
+        }
+    }
+
+    public static List<String> clusterSlots2Instance(List<Object> slots) {
+        List<String> nodes = new LinkedList<String>();
+        for (Object obj : slots) {
+            List<Object> slot = (List<Object>) obj;
+            List<Object> address = (List<Object>) slot.get(2);
+            if (address.size() == 2) {
+                String host = new String((byte[]) address.get(0));
+                nodes.add(host + ":" + address.get(1));
+            }
+            if (slot.size() > 3) {
+                address = (List<Object>) slot.get(3);
+                if (address.size() % 2 == 0) {
+                    for (int i = 0; i < address.size() / 2; i++) {
+                        String host = new String((byte[]) address.get(i * 2));
+                        nodes.add("    " + host + ":" + address.get(i * 2 + 1));
+                    }
+                }
+            }
+        }
+        return nodes;
+    }
+
+    public static String clusterSlots2String(List<Object> slots) {
+        StringBuilder builder = new StringBuilder();
+        for (Object obj : slots) {
+            List<Object> slot = (List<Object>) obj;
+            builder.append(slot.get(0));
+            builder.append("\t - \t");
+            builder.append(slot.get(1));
+            builder.append(": ");
+            List<Object> address = (List<Object>) slot.get(2);
+            if (address.size() == 2) {
+                builder.append(" master ");
+                builder.append(new String((byte[]) address.get(0)));
+                builder.append(address.get(1));
+            }
+            if (slot.size() > 3) {
+                address = (List<Object>) slot.get(3);
+                if (address.size() % 2 == 0) {
+                    builder.append(" slaves ");
+                    for (int i = 0; i < address.size() / 2; i++) {
+                        if (i != 0)
+                            builder.append(", ");
+                        builder.append(new String((byte[]) address.get(i * 2)));
+                        builder.append(address.get(i * 2 + 1));
+                    }
+                }
+            }
+            builder.append("\n");
+        }
+        return builder.toString();
     }
 }
