@@ -10,3 +10,4 @@ redis gui client: for CRUD
 
 相关界面：
 <img src="https://raw.githubusercontent.com/wangshichun/gui-redis-client/master/src/main/resources/redis_client.png"/>
+<img src="https://raw.githubusercontent.com/wangshichun/gui-redis-client/master/src/main/resources/redis_client_info.png"/>
