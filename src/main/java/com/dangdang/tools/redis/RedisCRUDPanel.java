@@ -82,7 +82,7 @@ public class RedisCRUDPanel extends JPanel {
         delButton.addMouseListener(new MouseAdapter() {
             @Override
             public void mouseClicked(MouseEvent e) {
-                doDel(redisKey.getText().trim(), delResult, false);
+                doDel(redisKey.getText().trim(), null, delResult, false);
             }
         });
 
@@ -119,9 +119,9 @@ public class RedisCRUDPanel extends JPanel {
 
         SwingUtil.addNewLineTo(this);
         SwingUtil.addSpaceTo(this, 4);
-        JButton scanButton = new JButton("正则匹配key(最多只扫描shard中的前2000条)");
+        JButton scanButton = new JButton("正则匹配key(keys命令)");
         this.add(scanButton);
-        label = new JLabel("查哪个shard(从0开始):");
+        label = new JLabel("查哪个shard(0、1、2等):");
         this.add(label);
         final JTextField shardText = new JTextField(3);
         this.add(shardText);
@@ -173,10 +173,10 @@ public class RedisCRUDPanel extends JPanel {
                 }
                 for (String key : list) {
                     DefaultListModel<String> model = (DefaultListModel<String>) scanResultList.getModel();
-                    doDel(key, delResult, true);
-                    if ("OK".equals(delResult.getText())) {
+                    doDel(key, Integer.valueOf(shardText.getText().trim()), delResult, true);
+//                    if ("OK".equals(delResult.getText())) {
                         model.removeElement(key);
-                    }
+//                    }
                 }
             }
         });
@@ -201,7 +201,7 @@ public class RedisCRUDPanel extends JPanel {
         resultLabel.setText("共 " + scanResult.size() + " 条");
     }
 
-    private void doDel(String key, JLabel delResult, boolean forceDelete) {
+    private void doDel(String key, Integer shardIndex, JLabel delResult, boolean forceDelete) {
         delResult.setText("");
         if (key.isEmpty()) {
             SwingUtil.alert("请先填写key");

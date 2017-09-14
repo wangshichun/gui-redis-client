@@ -162,7 +162,7 @@ public class RedisInfoPanel extends JPanel {
         info = jedis.randomKey();
         if (info != null && info.length() > 0) {
             List<String> timeList = jedis.time();
-            JTextArea textArea = new JTextArea(info + ": " + jedis.get(info) + "\nserver time: " +
+            JTextArea textArea = new JTextArea(info + ": " + new String(RedisUtil.get(0, info)) + "\nserver time: " +
                     dateFormat.format(new Date(Long.valueOf(timeList.get(0)) * 1000)) + "." + timeList.get(1) + "\ndbsize(keys in the db): "
                     + jedis.dbSize()
             );
@@ -292,12 +292,12 @@ public class RedisInfoPanel extends JPanel {
     }
 
     protected void initServers() {
-        java.util.List<String> clusterNodes = RedisUtil.clusterSlots2Instance(RedisUtil.clusterSlots(null));
+//        java.util.List<String> clusterNodes = RedisUtil.clusterSlots2Instance(RedisUtil.clusterSlots(), false);
         java.util.List<String> shards = RedisUtil.getAllShards();
-        for (String node : clusterNodes) {
-            if (!shards.contains(node.trim()))
-                shards.add(node);
-        }
+//        for (String node : clusterNodes) {
+//            if (!shards.contains(node.trim()))
+//                shards.add(node);
+//        }
         nodesBox.setVisible(false);
         nodesBox.removeAllItems();
         for (String node : shards) {
