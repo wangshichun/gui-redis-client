@@ -5,6 +5,7 @@ import com.dangdang.tools.redis.util.SwingUtil;
 import redis.clients.jedis.Client;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisMonitor;
+import redis.clients.jedis.exceptions.JedisConnectionException;
 import redis.clients.util.Slowlog;
 
 import javax.swing.*;
@@ -63,20 +64,27 @@ public class RedisInfoPanel extends JPanel {
     }
 
     private String currentAddress = null;
+    private Jedis getInfoJedis = null;
     private void displayInfo(final String address, int db, JTabbedPane tabbedPane) {
         if (address == null || address.indexOf(":") < 0)
             return;
 
-        Jedis jedis = RedisUtil.getJedis(address, db);
+        final Jedis jedis = RedisUtil.getJedis(address, db);
         if (jedis == null) {
             SwingUtil.alert("无法连接到：" + address);
             return;
+        } else if (getInfoJedis != null) {
+            try {
+                getInfoJedis.close();
+                getInfoJedis = null;
+            } catch (Exception e) {}
         }
 
         tabbedPane.setVisible(false);
         int selectedIndex = tabbedPane.getSelectedIndex();
         tabbedPane.removeAll();
         currentAddress = address;
+        getInfoJedis = jedis;
 
         // cluster info
         int columns = 100;
@@ -189,100 +197,110 @@ public class RedisInfoPanel extends JPanel {
         panel.add(buttonStart);
         panel.add(buttonStop);
         SwingUtil.addNewLineTo(panel);
-        buttonStart.addMouseListener(new MouseAdapter() {
-            @Override
-            public void mouseClicked(MouseEvent e) {
-                status.set(true);
-            }
-        });
-        buttonStop.addMouseListener(new MouseAdapter() {
-            @Override
-            public void mouseClicked(MouseEvent e) {
-                status.set(false);
-            }
-        });
         final JTextArea monitorInfo = new JTextArea();
         panel.add(new JScrollPane(monitorInfo));
         monitorInfo.setColumns(columns);
         monitorInfo.setRows(rows);
         monitorInfo.setEditable(false);
 
-        jedis.monitor(new JedisMonitor() {
+        buttonStart.addMouseListener(new MouseAdapter() {
             @Override
-            public void onCommand(String command) {
-            }
-            private long previousUpdateUITime = System.currentTimeMillis();
-            private Thread updateUIThread;
-            private void onCommand(String command, final Client client, final LinkedList<String> commandList) {
-                if (updateUIThread == null) {
-                    synchronized (this) {
-                        updateUIThread = new Thread(new Runnable() {
-                            @Override
-                            public void run() {
-                                while (true) {
-                                    try {
-                                        Thread.sleep(100);
-                                    } catch (InterruptedException e) {
-                                    }
-                                    if (status.get() == false)
-                                        continue;
-                                    if (monitorInfo.isVisible() == false)
-                                        continue;
-
-                                    final StringBuilder builder = new StringBuilder();
-                                    for (int i = 0; i < commandList.size(); i++) {
-                                        builder.append(commandList.get(i)).append("\n");
-                                    }
-                                    SwingUtilities.invokeLater(new Runnable() {
+            public void mouseClicked(MouseEvent e) {
+                if (!status.get()) {
+                    status.set(true);
+                    jedis.monitor(new JedisMonitor() {
+                        @Override
+                        public void onCommand(String command) {
+                        }
+                        private long previousUpdateUITime = System.currentTimeMillis();
+                        private Thread updateUIThread;
+                        private void onCommand(String command, final Client client, final LinkedList<String> commandList) {
+                            if (updateUIThread == null) {
+                                synchronized (this) {
+                                    updateUIThread = new Thread(new Runnable() {
                                         @Override
                                         public void run() {
-                                            try {
+                                            while (true) {
+                                                try {
+                                                    Thread.sleep(100);
+                                                } catch (InterruptedException e) {
+                                                }
+                                                if (status.get() == false)
+                                                    continue;
                                                 if (monitorInfo.isVisible() == false)
-                                                    return;
-                                                monitorInfo.setText(builder.length() < 1 ? "无信息" : builder.toString());
-                                            } catch (Throwable e) {
-                                                e.printStackTrace();
-                                                status.set(false);
+                                                    continue;
+
+                                                final StringBuilder builder = new StringBuilder();
+                                                for (int i = 0; i < commandList.size(); i++) {
+                                                    builder.append(commandList.get(i)).append("\n");
+                                                }
+                                                SwingUtilities.invokeLater(new Runnable() {
+                                                    @Override
+                                                    public void run() {
+                                                        try {
+                                                            if (monitorInfo.isVisible() == false)
+                                                                return;
+                                                            monitorInfo.setText(builder.length() < 1 ? "无信息" : builder.toString());
+                                                        } catch (Throwable e) {
+                                                            e.printStackTrace();
+                                                            status.set(false);
+                                                        }
+                                                    }
+                                                });
                                             }
                                         }
                                     });
+                                    updateUIThread.start();
                                 }
                             }
-                        });
-                        updateUIThread.start();
-                    }
-                }
-                if (commandList.size() > 1500) {
-                    for (int i = 0; i < 50; i++)
-                        commandList.remove(0);
-                }
-                int dotIndex = command.indexOf(".");
-                if (dotIndex > 0) {
-                    String time = command.substring(0, command.indexOf("."));
-                    command = dateFormat.format(new Date(Long.valueOf(time) * 1000)) + command.substring(command.indexOf("."));
-                }
-                commandList.add(command);
-            }
-            public void proceed(final Client client) {
-                client.setTimeoutInfinite();
-                new Thread(new Runnable() {
-                    LinkedList<String> commandList = new LinkedList<String>();
+                            if (commandList.size() > 1500) {
+                                for (int i = 0; i < 50; i++)
+                                    commandList.remove(0);
+                            }
+                            int dotIndex = command.indexOf(".");
+                            if (dotIndex > 0) {
+                                String time = command.substring(0, command.indexOf("."));
+                                command = dateFormat.format(new Date(Long.valueOf(time) * 1000)) + command.substring(command.indexOf("."));
+                            }
+                            commandList.add(command);
+                        }
+                        public void proceed(final Client client) {
+                            client.setTimeoutInfinite();
+                            new Thread(new Runnable() {
+                                LinkedList<String> commandList = new LinkedList<String>();
 
-                    @Override
-                    public void run() {
-                        do {
-                            if (status.get() == false) {
-                                try {
-                                    Thread.sleep(100);
-                                } catch (InterruptedException e) {
+                                @Override
+                                public void run() {
+                                    try {
+                                        do {
+                                            if (status.get() == false) {
+                                                try {
+                                                    Thread.sleep(100);
+                                                } catch (InterruptedException e) {
+                                                }
+                                                continue;
+                                            }
+                                            String command = client.getBulkReply();
+                                            onCommand(command, client, commandList);
+                                        } while (client.isConnected() && currentAddress.equals(address));
+                                    } catch (JedisConnectionException jce) {
+//                                        System.out.println("客户端已关闭");
+                                    }
                                 }
-                                continue;
-                            }
-                            String command = client.getBulkReply();
-                            onCommand(command, client, commandList);
-                        } while (client.isConnected() && currentAddress.equals(address));
-                    }
-                }).start();
+                            }).start();
+                        }
+                    });
+                }
+            }
+        });
+        buttonStop.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                status.set(false);
+                try {
+                    jedis.disconnect();
+                    jedis.connect();
+                } catch (Exception ex) {}
             }
         });
 
